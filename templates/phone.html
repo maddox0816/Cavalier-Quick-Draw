@@ -12,60 +12,187 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            font-family: Arial, sans-serif;
-            background: {{ color }};
+            font-family: Georgia, serif;
+            background: url('/static/background.jpg') no-repeat center center / cover;
+            color: #fff;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+            position: relative;
+            --player-color: {{ color }};
         }
+
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 0;
+        }
+
+        #controller-card {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.58);
+            border: 2px solid rgba(255, 248, 220, 0.6);
+            border-left: 6px solid var(--player-color);
+            border-radius: 12px;
+            padding: 28px 24px;
+            width: min(88vw, 430px);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+            box-sizing: border-box;
+        }
+
         h1 {
-            margin-bottom: 20px;
+            margin: 0 0 14px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #FFF8DC;
         }
+
+        #permissionBtn {
+            display: block;
+            width: 100%;
+            margin: 10px 0 18px;
+            padding: 14px 22px;
+            font-size: 1em;
+            cursor: pointer;
+            background: linear-gradient(135deg, #8B4513 0%, #D2691E 50%, #8B4513 100%);
+            color: #FFF8DC;
+            border: 3px solid #654321;
+            border-radius: 0;
+            font-weight: 700;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 15px rgba(139, 69, 19, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-family: Georgia, serif;
+        }
+
+        #permissionBtn:hover {
+            transform: scale(1.03);
+            box-shadow: 0 6px 20px rgba(139, 69, 19, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 12px rgba(255, 215, 0, 0.45);
+            background: linear-gradient(135deg, #A0522D 0%, #FF8C00 50%, #A0522D 100%);
+        }
+
+        #permissionBtn:active {
+            transform: scale(0.98);
+        }
+
         #status {
-            font-size: 1.5em;
-            color: green;
+            font-size: 1.2em;
+            color: #FFE9A9;
+            min-height: 1.4em;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            padding: 8px 10px;
+            border: 1px solid rgba(255, 248, 220, 0.25);
+            background: rgba(0, 0, 0, 0.28);
+            transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+        }
+
+        #status.state-waiting {
+            color: #FFE9A9;
+        }
+
+        #status.state-detected {
+            color: #FFD166;
+            border-color: rgba(255, 209, 102, 0.65);
+            background: rgba(80, 40, 10, 0.45);
+            transform: scale(1.02);
+        }
+
+        #status.state-win {
+            color: #7CFF98;
+            border-color: rgba(124, 255, 152, 0.8);
+            background: rgba(18, 70, 30, 0.45);
+        }
+
+        #status.state-lose {
+            color: #FF9A9A;
+            border-color: rgba(255, 154, 154, 0.8);
+            background: rgba(95, 15, 15, 0.45);
+        }
+
+        #status.state-error {
+            color: #FFB3B3;
+            border-color: rgba(255, 120, 120, 0.85);
+            background: rgba(110, 0, 0, 0.45);
         }
     </style>
 </head>
 <body>
-    <h1>Phone Controller</h1>
-    <button id="permissionBtn" style="display:block; padding: 10px 20px; font-size: 1em; cursor: pointer;">Request Permission</button>
-    <div id="status">Waiting for movement...</div>
+    <div id="controller-card">
+        <h1>Cavalier Quick Draw </h1>
+        <button id="permissionBtn">Request Permission</button>
+        <div id="status">Waiting for movement...</div>
+    </div>
 
     <script>
         const color = "{{ color }}";
+        const statusEl = document.getElementById('status');
+        const permissionBtn = document.getElementById('permissionBtn');
+        let motionListeningStarted = false;
+
+        function setStatus(text, state = 'waiting') {
+            statusEl.textContent = text;
+            statusEl.className = '';
+            statusEl.classList.add(`state-${state}`);
+        }
+
+        function startMotionListening() {
+            if (motionListeningStarted) {
+                return;
+            }
+            window.addEventListener('devicemotion', handleDeviceMotion);
+            motionListeningStarted = true;
+            permissionBtn.style.display = 'none';
+        }
+
+        setStatus('Waiting for movement...', 'waiting');
+
         if (window.DeviceMotionEvent) {
             // Check if requestPermission is available (iOS 13+)
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(permissionState => {
                         if (permissionState === 'granted') {
-                            window.addEventListener('devicemotion', handleDeviceMotion);
+                            startMotionListening();
+                            setStatus('Ready. Waiting for movement...', 'waiting');
                         } else {
-                            document.getElementById('status').textContent = 'Permission denied.';
+                            setStatus('Permission denied.', 'error');
                         }
                     })
                     .catch(error => {
-                        document.getElementById('status').textContent = 'Error requesting permission: ' + error;
+                        setStatus('Error requesting permission: ' + error, 'error');
                     });
             } else {
                 // For non-iOS devices
-                window.addEventListener('devicemotion', handleDeviceMotion);
+                startMotionListening();
+                setStatus('Ready. Waiting for movement...', 'waiting');
             }
         } else {
-            document.getElementById('status').textContent = 'Device motion not supported.';
+            setStatus('Device motion not supported.', 'error');
         }
 
-        document.getElementById('permissionBtn').addEventListener('click', askPermission);
+        permissionBtn.addEventListener('click', askPermission);
 
         function askPermission() {
+            if (typeof DeviceMotionEvent === 'undefined' || typeof DeviceMotionEvent.requestPermission !== 'function') {
+                setStatus('Permission not required on this device.', 'waiting');
+                return;
+            }
+
             DeviceMotionEvent.requestPermission()
                 .then(permissionState => {
                     if (permissionState === 'granted') {
-                        window.addEventListener('devicemotion', handleDeviceMotion);
+                        startMotionListening();
+                        setStatus('Ready. Waiting for movement...', 'waiting');
                     } else {
-                        document.getElementById('status').textContent = 'Permission denied.';
+                        setStatus('Permission denied.', 'error');
                     }
                 })
                 .catch(error => {
-                    document.getElementById('status').textContent = 'Error requesting permission: ' + error;
+                    setStatus('Error requesting permission: ' + error, 'error');
                 });
         }
 
@@ -77,7 +204,7 @@
 
             // Simple threshold to detect a jerk
             if (Math.abs(x) > 15 || Math.abs(y) > 15 || Math.abs(z) > 15) {
-                document.getElementById('status').textContent = 'Movement detected!';
+                setStatus('Movement detected!', 'detected');
                 // Here you can send a request to the server to notify about the movement
                 fetch('/phone-has-been-jerked-up', {
                     method: 'POST',
@@ -91,7 +218,7 @@
                     }else if (response.status === 200) {
                         response.json().then(data => {
                             if (data.winner) {
-                                document.getElementById('status').textContent = `Game already won by ${data.winner}`;
+                                setStatus(`Game already won by ${data.winner}`, data.winner === color ? 'win' : 'lose');
                                 //check if winner is me
                                 if (data.winner === color) {
                                     document.body.style.backgroundColor = color;
@@ -104,6 +231,7 @@
                                     gunshotImg.style.left = '50%';
                                     gunshotImg.style.transform = 'translate(-50%, -50%)';
                                     gunshotImg.style.width = '200px';
+                                    gunshotImg.style.zIndex = 40;
                                     document.body.appendChild(gunshotImg);
                                     //vibrate the phone if supported
                                     if (navigator.vibrate) {
@@ -116,10 +244,11 @@
                     }
                 }).catch(error => {
                     console.error('Error notifying server:', error);
+                    setStatus('Could not notify server.', 'error');
                 });
                 //delay 1 second and reset the status text
                 setTimeout(() => {
-                    document.getElementById('status').textContent = 'Waiting for movement...';
+                    setStatus('Waiting for movement...', 'waiting');
                 }, 1000);
             }
         }
