@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cavalier Quick Draw</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: url('/static/background.jpg') no-repeat center center / cover;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        h1,
+        p,
+        #phone-status,
+        #playMusicBtn {
+            position: relative;
+            z-index: 2;
+        }
+
+        #tumbleweed-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .tumbleweed {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            transform-origin: center center;
+            will-change: transform;
+            user-select: none;
+        }
+
+        #phone-status {
+            margin: 10px 0 16px 0;
+        }
+
+        .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            background: #7a7a7a; /* grey by default */
+        }
+
+        .dot.connected {
+            background: #26d34a; /* green when connected */
+        }
+
+        #main-content {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 30px 50px;
+            border-radius: 12px;
+            z-index: 5;
+        }
+
+        .playMusicBtn {
+            display: block;
+            padding: 14px 36px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin: 20px auto 0;
+            background: linear-gradient(135deg, #8B4513 0%, #D2691E 50%, #8B4513 100%);
+            color: #FFF8DC;
+            border: 3px solid #654321;
+            border-radius: 0px;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(139, 69, 19, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: Georgia, serif;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        .playMusicBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(139, 69, 19, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 15px rgba(255, 215, 0, 0.5);
+            background: linear-gradient(135deg, #A0522D 0%, #FF8C00 50%, #A0522D 100%);
+        }
+
+        .playMusicBtn:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(139, 69, 19, 0.8), inset 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="main-content">
+        <h1>Cavalier Quick Draw</h1>
+        <button id="playMusicBtn" class="playMusicBtn">Play as Host (Laptop)</button>
+        <button id="joinGameBtn" class="playMusicBtn">Join Game (Phone)</button>
+    </div>
+    <div id="tumbleweed-layer"></div>
+    <script>
+        document.getElementById('playMusicBtn').addEventListener('click', () => {
+            window.location.href = '/laptop';
+        });
+        document.getElementById('joinGameBtn').addEventListener('click', () => {
+            window.location.href = '/phone';
+        });
+
+        const tumbleweedConfig = {
+            maxActive: 3,
+            minSpawnMs: 3500,
+            maxSpawnMs: 9000,
+            minTravelSpeed: 230,
+            maxTravelSpeed: 320,
+            minLaunchVy: 620,
+            maxLaunchVy: 900,
+            gravity: 1800,
+            bounceRestitution: 0.74,
+            impactFriction: 0.995,
+            airDrag: 0.9998,
+            rollDrag: 0.9985,
+            minBounceVy: 120,
+            maxBounces: 14,
+            minExitSpeed: 190,
+            spinSmoothing: 0.18,
+            offscreenPadding: 180
+        };
+
+        const tumbleweeds = [];
+        let tumbleweedSpawnTimer = null;
+        let lastTumbleweedFrame = performance.now();
+
+        function randomBetween(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function removeTumbleweed(index) {
+            const tumbleweed = tumbleweeds[index];
+            if (!tumbleweed) {
+                return;
+            }
+            tumbleweed.el.remove();
+            tumbleweeds.splice(index, 1);
+        }
+
+        function spawnTumbleweed() {
+            if (tumbleweeds.length >= tumbleweedConfig.maxActive) {
+                return;
+            }
+
+            const fromLeft = Math.random() > 0.5;
+            const size = randomBetween(108, 186);
+            const startX = fromLeft ? -size : window.innerWidth + size;
+            const speed = randomBetween(tumbleweedConfig.minTravelSpeed, tumbleweedConfig.maxTravelSpeed);
+            const vx = fromLeft ? speed : -speed;
+
+            const el = document.createElement('img');
+            el.src = '/static/tumbleweed.png';
+            el.className = 'tumbleweed';
+            el.alt = '';
+            el.width = Math.round(size);
+            tumbleweedLayer.appendChild(el);
+
+            tumbleweeds.push({
+                el,
+                x: startX,
+                y: randomBetween(0, 10),
+                vx,
+                vy: randomBetween(tumbleweedConfig.minLaunchVy, tumbleweedConfig.maxLaunchVy),
+                rotation: randomBetween(0, 360),
+                spin: (fromLeft ? 1 : -1) * randomBetween(160, 260),
+                spinFactor: randomBetween(0.92, 1.12),
+                bounces: 0,
+                rolling: false,
+                size,
+                fromLeft
+            });
+        }
+
+        function scheduleNextTumbleweed() {
+            if (tumbleweedSpawnTimer) {
+                clearTimeout(tumbleweedSpawnTimer);
+            }
+
+            const delay = randomBetween(tumbleweedConfig.minSpawnMs, tumbleweedConfig.maxSpawnMs);
+            tumbleweedSpawnTimer = setTimeout(() => {
+                spawnTumbleweed();
+                scheduleNextTumbleweed();
+            }, delay);
+        }
+
+        function animateTumbleweeds(now) {
+            const dt = Math.min((now - lastTumbleweedFrame) / 1000, 0.033);
+            lastTumbleweedFrame = now;
+
+            for (let i = tumbleweeds.length - 1; i >= 0; i--) {
+                const tumbleweed = tumbleweeds[i];
+
+                tumbleweed.vy -= tumbleweedConfig.gravity * dt;
+                tumbleweed.x += tumbleweed.vx * dt;
+                tumbleweed.y += tumbleweed.vy * dt;
+
+                const direction = tumbleweed.vx >= 0 ? 1 : -1;
+                const radius = Math.max(tumbleweed.size / 2, 1);
+                const wheelSpinDegPerSec = (Math.abs(tumbleweed.vx) / radius) * (180 / Math.PI) * tumbleweed.spinFactor;
+                const targetSpin = direction * (tumbleweed.rolling ? wheelSpinDegPerSec : wheelSpinDegPerSec * 0.8);
+                tumbleweed.spin += (targetSpin - tumbleweed.spin) * tumbleweedConfig.spinSmoothing;
+                tumbleweed.rotation += tumbleweed.spin * dt;
+
+                if (tumbleweed.y <= 0) {
+                    tumbleweed.y = 0;
+
+                    if (tumbleweed.vy < 0) {
+                        tumbleweed.vy = -tumbleweed.vy * tumbleweedConfig.bounceRestitution;
+                        tumbleweed.vx *= tumbleweedConfig.impactFriction;
+                        tumbleweed.bounces += 1;
+
+                        if (tumbleweed.vy < tumbleweedConfig.minBounceVy || tumbleweed.bounces >= tumbleweedConfig.maxBounces) {
+                            tumbleweed.vy = 0;
+                            tumbleweed.rolling = true;
+                        }
+                    }
+                }
+
+                if (tumbleweed.rolling) {
+                    tumbleweed.vx *= tumbleweedConfig.rollDrag;
+                } else {
+                    tumbleweed.vx *= tumbleweedConfig.airDrag;
+                }
+
+                if (Math.abs(tumbleweed.vx) < tumbleweedConfig.minExitSpeed) {
+                    tumbleweed.vx = tumbleweed.vx >= 0
+                        ? tumbleweedConfig.minExitSpeed
+                        : -tumbleweedConfig.minExitSpeed;
+                }
+
+                tumbleweed.el.style.transform = `translate3d(${tumbleweed.x}px, ${-tumbleweed.y}px, 0) rotate(${tumbleweed.rotation}deg)`;
+
+                const beyondRight = tumbleweed.x > window.innerWidth + tumbleweedConfig.offscreenPadding;
+                const beyondLeft = tumbleweed.x < -tumbleweed.size - tumbleweedConfig.offscreenPadding;
+                const reachedExitSide = tumbleweed.fromLeft ? beyondRight : beyondLeft;
+
+                if (reachedExitSide) {
+                    removeTumbleweed(i);
+                }
+            }
+
+            requestAnimationFrame(animateTumbleweeds);
+        }
+
+        scheduleNextTumbleweed();
+        requestAnimationFrame(animateTumbleweeds);
+    </script>

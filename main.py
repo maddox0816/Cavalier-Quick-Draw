@@ -23,6 +23,10 @@ app.config['SECRET_KEY'] = 'your_secret_key'
 
 socketio = SocketIO(app)
 
+@app.route("/")
+def index():
+    return flask.render_template("index.html")
+
 @app.route("/phone")
 def phone():
     socketio.emit('phone_connected')
