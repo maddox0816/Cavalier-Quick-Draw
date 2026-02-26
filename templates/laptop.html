@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <title>Cavalier Quick Draw</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16x16.png">
+    <link rel="manifest" href="/static/icons/site.webmanifest">
     <style>
         body {
             margin: 0;
@@ -156,7 +160,7 @@
             .catch(() => {
                 qrCodeImg.alt = 'Failed to load QR code';
             });
-            
+
 
         const tumbleweedConfig = {
             maxActive: 3,
