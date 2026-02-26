@@ -398,6 +398,13 @@
             if (!isInfoPlayed) {
                 infoAudio.play().then(() => {
                     isInfoPlayed = true;
+                    //wait 7 seconds then play the music
+                    setTimeout(() => {
+                        if (!isMusicPlaying) {
+                            audio.play();
+                            isMusicPlaying = true;
+                        }
+                    }, 7000);
                 }).catch(() => {
                     console.log('Info audio playback failed');
                 });
