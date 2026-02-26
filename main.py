@@ -96,6 +96,8 @@ def handle_begin_game():
     time.sleep(time_to_wait)
     socketio.emit('ready_aim')
     time.sleep(3)
+    #sleep between 2 and 5 seconds before allowing to shoot
+    time.sleep(2 + (3 * random.random()))
     socketio.emit('begin_shooting')
     allowed_to_shoot = True
 

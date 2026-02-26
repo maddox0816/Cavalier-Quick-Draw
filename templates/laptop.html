@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Cavalier Quick Draw - Laptop</title>
+    <title>Cavalier Quick Draw</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body {
@@ -62,18 +62,73 @@
         .dot.connected {
             background: #26d34a; /* green when connected */
         }
+
+        #main-content {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 30px 50px;
+            border-radius: 12px;
+            z-index: 5;
+        }
+
+        #playMusicBtn {
+            display: block;
+            padding: 14px 36px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin: 20px auto 0;
+            background: linear-gradient(135deg, #8B4513 0%, #D2691E 50%, #8B4513 100%);
+            color: #FFF8DC;
+            border: 3px solid #654321;
+            border-radius: 0px;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(139, 69, 19, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: Georgia, serif;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        #playMusicBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(139, 69, 19, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 15px rgba(255, 215, 0, 0.5);
+            background: linear-gradient(135deg, #A0522D 0%, #FF8C00 50%, #A0522D 100%);
+        }
+
+        #playMusicBtn:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(139, 69, 19, 0.8), inset 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
     </style>
 </head>
 <body>
-    <h1>Cavalier Quick Draw - Laptop</h1>
-    <p id="statusText">Waiting for phone connections...</p>
+    <div id="main-content">
+        <h1>Cavalier Quick Draw</h1>
+        <div id="info">
+            <h2 style="margin-top: 0;">How It Works</h2>
+            <ol style="padding-left: 20px; margin-bottom: 0; text-align: left;">
+                <li>Open this page on your laptop.</li>
+                <li>Click the "Play" button to enable audio and connect to the server.</li>
+                <li>On each phone, open the camera and scan the QR code to connect.</li>
+                <li>Once both phones are connected, follow the prompts to play!</li>
+            </ol>
+            <button id="playMusicBtn" style="display:block; padding: 10px 20px; font-size: 1em; cursor: pointer;">Play</button>
+        </div>
+        <div id="main-game" style="display:none;">
+            <p id="statusText">Waiting for phone connections...</p>
 
-    <div id="phone-status">
-        <span id="dot-0" class="dot" title="Player 1"></span>
-        <span id="dot-1" class="dot" title="Player 2"></span>
+            <div id="phone-status">
+                <span id="dot-0" class="dot" title="Player 1"></span>
+                <span id="dot-1" class="dot" title="Player 2"></span>
+            </div>
+
+            <div id="qr-code-container" style="margin-top: 30px;">
+                <p>Scan to connect:</p>
+                <img id="qr-code-placeholder" src="https://placehold.co/200x200?text=QR%20CODE" alt="QR Code Placeholder" style="width: 200px; height: 200px; border: 2px solid #fff; padding: 10px; background: #fff;">
+            </div>
+        </div>  
     </div>
-
-    <button id="playMusicBtn" style="display:block; padding: 10px 20px; font-size: 1em; cursor: pointer;">Click Me First</button>
 
     <div id="tumbleweed-layer"></div>
 
@@ -264,7 +319,7 @@
                 }
             });
 
-            // Backward compatibility if your server still emits this old event
+            // Backward compatibility for early version
             socket.on('phone_connected', () => {
                 console.log('Phone connected!');
                 statusText.textContent = 'Phone connected! Waiting for second phone...';
@@ -290,8 +345,25 @@
             socket.on('game_over', (data) => {
                 console.log('Game over! Winner:', data.winner);
                 statusText.textContent = `Game Over! Winner: ${data.winner}`;
-                //change the background color to the winning color
-                document.body.style.backgroundColor = data.winner;
+                //add an overlay that covers the background image with the winner's color partially transparent
+                const overlay = document.createElement('div');
+                overlay.style.position = 'fixed';
+                overlay.style.top = 0;
+                overlay.style.left = 0;
+                overlay.style.width = '100vw';
+                overlay.style.height = '100vh';
+                //color options color_options = ["red", "blue", "green", "yellow", "purple", "orange"]
+                const colorOptions = {
+                    red: 'rgba(255, 0, 0, 0.5)',
+                    blue: 'rgba(0, 0, 255, 0.5)',
+                    green: 'rgba(0, 255, 0, 0.5)',
+                    yellow: 'rgba(255, 255, 0, 0.5)',
+                    purple: 'rgba(128, 0, 128, 0.5)',
+                    orange: 'rgba(255, 165, 0, 0.5)'
+                };
+                overlay.style.backgroundColor = colorOptions[data.winner] || 'rgba(255, 255, 255, 0.5)';
+                overlay.style.zIndex = 3;
+                document.body.appendChild(overlay);
 
                 if (isMusicPlaying) {
                     audio.pause();
@@ -331,6 +403,8 @@
                 });
             }
             document.getElementById('playMusicBtn').style.display = 'none';
+            document.getElementById('info').style.display = 'none';
+            document.getElementById('main-game').style.display = 'block';
             initializeSocket();
         });
 
