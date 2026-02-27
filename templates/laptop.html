@@ -152,7 +152,7 @@
 
         //generate the QR code for the current page URL
         const qrCodeImg = document.getElementById('qr-code-placeholder');
-        fetch('/qr-code?url=' + encodeURIComponent(window.location.href.replace('/laptop', '/phone')))
+        fetch('/qr-code?url=' + encodeURIComponent(window.location.href.replace('/laptop', '/')))
             .then(response => response.blob())
             .then(blob => {
                 const url = URL.createObjectURL(blob);

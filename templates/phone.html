@@ -133,6 +133,7 @@
 
     <script>
         const color = "{{ color }}";
+        const username = "{{ username }}"
         const statusEl = document.getElementById('status');
         const permissionBtn = document.getElementById('permissionBtn');
         let motionListeningStarted = false;
@@ -161,7 +162,7 @@
                     .then(permissionState => {
                         if (permissionState === 'granted') {
                             startMotionListening();
-                            setStatus('Ready. Waiting for movement...', 'waiting');
+                            setStatus('Ready. Waiting for movement from ' + username + '...', 'waiting');
                         } else {
                             setStatus('Permission denied.', 'error');
                         }
@@ -172,7 +173,7 @@
             } else {
                 // For non-iOS devices
                 startMotionListening();
-                setStatus('Ready. Waiting for movement...', 'waiting');
+                setStatus('Ready. Waiting for movement from ' + username + '...', 'waiting');
             }
         } else {
             setStatus('Device motion not supported.', 'error');
@@ -207,7 +208,7 @@
             var z = acceleration.z;
 
             // Simple threshold to detect a jerk
-            if (Math.abs(x) > 15 || Math.abs(y) > 15 || Math.abs(z) > 15) {
+            if (Math.abs(x) > 15) {
                 setStatus('Movement detected!', 'detected');
                 // Here you can send a request to the server to notify about the movement
                 fetch('/phone-has-been-jerked-up', {
@@ -215,18 +216,18 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ color: color })
+                    body: JSON.stringify({ color: color, username : username })
                 }).then(response => {
                     if (!response.ok) {
                         console.error('Error notifying server:', response.statusText);
                     }else if (response.status === 200) {
                         response.json().then(data => {
                             if (data.winner) {
-                                setStatus(`Game already won by ${data.winner}`, data.winner === color ? 'win' : 'lose');
+                                setStatus(`Game already won by ${data.winner}`, data.winner === username ? 'win' : 'lose');
                                 //check if winner is me
-                                if (data.winner === color) {
+                                if (data.winner === username) {
                                     document.body.style.backgroundColor = color;
-                                }else if (data.winner !== color) {
+                                }else if (data.winner !== username) {
                                     //add gunshot.png over the center big on the screen
                                     const gunshotImg = document.createElement('img');
                                     gunshotImg.src = '/static/gunshot.png';

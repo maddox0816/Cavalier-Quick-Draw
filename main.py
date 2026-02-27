@@ -12,22 +12,33 @@ import time
 import random
 import qrcode
 from io import BytesIO
+import sqlite3
+
+db_connection = sqlite3.connect('users.db')
+cursor = db_connection.cursor()
+
+cursor.execute("""CREATE TABLE IF NOT EXISTS users(
+               user_id INTEGER PRIMARY KEY,
+               username TEXT NOT NULL,
+               wins INTEGER,
+               games_played INTEGER,
+               UNIQUE (username) on conflict ABORT
+               )""")
+db_connection.commit()
+cursor.close()
+db_connection.close()
 
 time_of_most_recent_movement = datetime.datetime.now()
 allowed_to_shoot = False
 connected_phones = 0
 color_options = ["red", "blue", "green", "yellow", "purple", "orange"]
 colors_used = []
-winning_color = None
+winning_player = None
 
 app = flask.Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 
 socketio = SocketIO(app)
-
-@app.route("/")
-def index():
-    return flask.render_template("index.html")
 
 @app.route("/qr-code", methods=['GET'])
 def qr_code():
@@ -43,9 +54,30 @@ def qr_code():
 
 
 
+@app.route('/', methods=['GET','POST'])
+def front_page():
+    db_connection = sqlite3.connect('users.db')
+    cursor = db_connection.cursor()
+    if request.method=='POST':
+        part1 = request.form['namepart1']
+        part2 = request.form['chosenusername']
+        NAME = f"{part1} {part2}"
+        try:
+            cursor.execute(f"""INSERT INTO users (username, wins, games_played) values ('{NAME}', 0, 0)""")
+            db_connection.commit()
+            print("user created")
+            return flask.redirect(flask.url_for('phone', username=NAME))
+        except sqlite3.IntegrityError:
+            print('user already exists')
+            return flask.redirect(flask.url_for('phone', username=NAME))
+        finally:
+            cursor.close()
+            db_connection.close()
+   
+    return flask.render_template('login.html')
 
-@app.route("/phone")
-def phone():
+@app.route("/phone/<username>")
+def phone(username):
     socketio.emit('phone_connected')
     #update global variable connected_phones
     global connected_phones
@@ -53,17 +85,18 @@ def phone():
     socketio.emit('phone_status', {'slots': [True, True] if connected_phones >= 2 else [True, False]})
     color = random.choice([c for c in color_options if c not in colors_used])
     colors_used.append(color)
-    return flask.render_template("phone.html", color=color)
+    return flask.render_template("phone.html", color=color, username=username)
 
 @app.route("/phone-has-been-jerked-up", methods=['POST'])
 def phone_has_been_jerked_up():
     payload = request.get_json()
     color = payload.get('color')
-    print("Phone has been jerked up by " + color)
-    global time_of_most_recent_movement, allowed_to_shoot, winning_color
-    if winning_color is not None:
-        print("Game already won by " + winning_color)
-        thing_to_return = jsonify({"winner": winning_color})
+    username = payload.get('username')
+    print("Phone has been jerked up by " + username)
+    global time_of_most_recent_movement, allowed_to_shoot, winning_player
+    if winning_player is not None:
+        print("Game already won by " + winning_player)
+        thing_to_return = jsonify({"winner": winning_player})
         thing_to_return.status_code = 200
         return thing_to_return
     if not allowed_to_shoot:
@@ -72,12 +105,36 @@ def phone_has_been_jerked_up():
     if (datetime.datetime.now() - time_of_most_recent_movement).total_seconds() < 1:
         print("Too soon, ignoring movement")
         return "Too soon", 429
-    socketio.emit('player_moved', {'player_name': f"Player {color}", 'movement': 'jerked up'})
+    socketio.emit('player_moved', {'player_name': f"Player {username}", 'movement': 'jerked up'})
 
     time_of_most_recent_movement = datetime.datetime.now()
     allowed_to_shoot = False
-    winning_color = color
-    socketio.emit('game_over', {'winner': winning_color})
+    winning_player = username
+    print(f"winning player is: {winning_player}\nyour name is: {username}")
+    if(username == winning_player):
+        print(f"adding {username} win to database")
+        db_connection = sqlite3.connect('users.db')
+        cursor = db_connection.cursor()       
+        win_results = cursor.execute(f"SELECT wins, games_played FROM users WHERE username='{winning_player}'")
+        data_array = win_results.fetchone()
+        winner_wins = data_array[0]
+        winner_games = data_array[1]
+        cursor.execute(f"UPDATE users SET wins={winner_wins+1}, games_played={winner_games+1} WHERE username='{winning_player}'")
+        db_connection.commit()
+        cursor.close()
+        db_connection.close()
+    else:
+        print(f"adding {username} loss to database")
+        db_connection = sqlite3.connect('users.db')
+        cursor = db_connection.cursor()       
+        win_results = cursor.execute(f"SELECT games_played FROM users WHERE username='{username}'")
+        data_array = win_results.fetchone()
+        loser_games = data_array[0]
+        cursor.execute(f"UPDATE users SET games_played={loser_games+1} WHERE username='{username}'")
+        db_connection.commit()
+        cursor.close()
+        db_connection.close()
+    socketio.emit('game_over', {'winner': winning_player})
     return "OK"
 
 @app.route("/laptop")
@@ -117,17 +174,15 @@ def handle_begin_game():
     time.sleep(time_to_wait)
     socketio.emit('ready_aim')
     time.sleep(3)
-    #sleep between 2 and 5 seconds before allowing to shoot
-    time.sleep(2 + (3 * random.random()))
     socketio.emit('begin_shooting')
     allowed_to_shoot = True
 
 @socketio.on('reset_game')
 def handle_reset_game():
-    global allowed_to_shoot, connected_phones, colors_used, winning_color
+    global allowed_to_shoot, connected_phones, colors_used, winning_player
     colors_used = []
     connected_phones = 0
-    winning_color = None
+    winning_player = None
     allowed_to_shoot = False
     print("Game reset")
     socketio.emit('game_reset')
